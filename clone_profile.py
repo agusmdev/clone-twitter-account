@@ -16,14 +16,16 @@ class Api(object):
         auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
 
         # Return API access:
-        self.api = tweepy.API(auth)
+        self.api = tweepy.API(auth, wait_on_rate_limit=True,
+                              wait_on_rate_limit_notify=True, compression=True)
 
     def get_user(self, user):
         return self.api.get_user(user)
 
-    def retrieve_tweets(self, user, count=10):
+    def retrieve_tweets(self, user, count=10, include_rts=False):
         try:
-            return self.api.user_timeline(screen_name=user, count=20)
+            return self.api.user_timeline(screen_name=user, count=20,
+                                          include_rts=include_rts)
         except Exception as e:
             raise e
 
@@ -36,18 +38,16 @@ class Api(object):
 
     def clone_last_tweets(self, user_clone):
         tweets = self.retrieve_tweets(user_clone)[::-1]
-        self.post_tweet("cloning.. @{}".format(user_clone))
+        self.post_tweet("@{} is going to be cloned".format(user_clone))
 
         for tweet in tweets:
             # Print tweet:
             print(tweet.text)
-            if tweet.text[0] != "R" and tweet.text[1] != "T":
-                self.post_tweet(tweet.text)
-        return True
+            self.post_tweet(tweet.text)
 
     def delete_tweets(self):
-        print("Deleting all tweets from the account @%s."
-              % self.api.verify_credentials().screen_name)
+        print("Deleting all tweets from the account @".
+              format(self.api.verify_credentials().screen_name))
         for status in tweepy.Cursor(self.api.user_timeline).items():
             try:
                 self.api.destroy_status(status.id)
@@ -56,14 +56,22 @@ class Api(object):
 
     def print_tweets(self, tweets):
         for i in tweets:
-            print(i.text)
+            print(i.text+"\n")
+
+    def follow_all_users(self, user):
+        for page in tweepy.Cursor(self.api.followers_ids, screen_name=user).pages():
+            [self.api.create_friendship(id=i) for i in page]
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--print", help="print tweets from the give profile",
+    parser.add_argument("-p", "--print", help="print tweets from the given profile",
                         action="store_true")
-    parser.add_argument("-c", "--clone", help="clone some tweets from the give profile",
+    parser.add_argument("-c", "--clone", help="clone some tweets from the given profile",
+                        action="store_true")
+    parser.add_argument("-d", "--delete", help="delete all tweets from the account",
+                        action="store_true")
+    parser.add_argument("-f", "--follow", help="follow all users from the given profile",
                         action="store_true")
     args = parser.parse_args()
 
@@ -73,7 +81,11 @@ if __name__ == '__main__':
 
     if args.print:
         bot.print_tweets(bot.retrieve_tweets(user))
-    elif args.clone:
+    if args.clone:
         bot.clone_last_tweets(user)
-    else:
-        print("LA CONCHA DE TU MADRE")
+    if args.follow:
+        bot.follow_all_users(user)
+    if args.delete:
+        print("This will be developed soon..")
+    if len(set(vars(args).values())) == 1:
+        print("No flags given, nothing to do")
