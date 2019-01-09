@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import tweepy
-import time
-import re
 import requests
 from access import *
-from random import randint
 import argparse
-import threading
 
 
 class Api(object):
@@ -114,12 +110,12 @@ if __name__ == '__main__':
                         action="store_true")
     parser.add_argument("-c", "--clone", help="clone some tweets from the given profile",
                         action="store_true")
-    parser.add_argument("-d", "--delete", help="delete all tweets from the account",
+    parser.add_argument("-d", "--delete", help="delete all tweets from the authenticated account",
                         action="store_true")
-    parser.add_argument("-f", "--follow", help="follow all users from the given profile",
+    parser.add_argument("-f", "--follow", help="follow all users from the given profile [slow]",
                         action="store_true")
-    parser.add_argument("-up", help="update profile photo using the profile photo \
-                                     from the given profile",
+    parser.add_argument("-up", help="update profile data using the profile cloning \
+                         the given profile",
                         action="store_true")
     parser.add_argument("--user", help="provide user to clone from the command line",
                         action="store", type=str)
