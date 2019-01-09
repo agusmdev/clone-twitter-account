@@ -13,12 +13,16 @@ import threading
 class Api(object):
     def __init__(self):
         super(Api, self).__init__()
-        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-        auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
+        try:
+            auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+            auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
+            # Return API access:
+            self.api = tweepy.API(auth, wait_on_rate_limit=True,
+                                  wait_on_rate_limit_notify=True, compression=True)
 
-        # Return API access:
-        self.api = tweepy.API(auth, wait_on_rate_limit=True,
-                              wait_on_rate_limit_notify=True, compression=True)
+            redirect_url = auth.get_authorization_url()
+        except tweepy.TweepError:
+            raise Exception('Error! Failed to get request token.')
 
     def get_user(self, user):
         return self.api.get_user(user)
@@ -73,6 +77,9 @@ class Api(object):
 
         self.api.update_profile_image("./last_cloned_profile.jpg")
 
+        print("Successfully changed profile photo, you used @{} photo".
+              format(user.screen_name))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -93,7 +100,7 @@ if __name__ == '__main__':
 
     bot = Api()
     secs = 1
-    
+
     if args.user:
         user = args.user
     else:
