@@ -3,6 +3,7 @@
 import tweepy
 import time
 import re
+import requests
 from access import *
 from random import randint
 import argparse
@@ -62,6 +63,16 @@ class Api(object):
         for page in tweepy.Cursor(self.api.followers_ids, screen_name=user).pages():
             [self.api.create_friendship(id=i) for i in page]
 
+    def update_profile_photo(self, user):
+        user = self.get_user(user)
+        image_url = user.profile_image_url[:63]+user.profile_image_url[70:]
+        img_data = requests.get(image_url).content
+
+        with open('last_cloned_profile.jpg', 'wb') as handler:
+            handler.write(img_data)
+
+        self.api.update_profile_image("./last_cloned_profile.jpg")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -72,6 +83,9 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--delete", help="delete all tweets from the account",
                         action="store_true")
     parser.add_argument("-f", "--follow", help="follow all users from the given profile",
+                        action="store_true")
+    parser.add_argument("-up", help="update profile photo using the profile photo \
+                                     from the given profile",
                         action="store_true")
     args = parser.parse_args()
 
@@ -87,5 +101,7 @@ if __name__ == '__main__':
         bot.follow_all_users(user)
     if args.delete:
         print("This will be developed soon..")
+    if args.up:
+        bot.update_profile_photo(user)
     if len(set(vars(args).values())) == 1:
         print("No flags given, nothing to do")
