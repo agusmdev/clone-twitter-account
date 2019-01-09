@@ -22,7 +22,8 @@ class Api(object):
 
             redirect_url = auth.get_authorization_url()
         except tweepy.TweepError:
-            raise Exception('Error! Failed to get request token.')
+            raise Exception('Error! Failed to get request token, please complete \
+                            access file')
 
     def get_user(self, user):
         return self.api.get_user(user)
@@ -67,17 +68,43 @@ class Api(object):
         for page in tweepy.Cursor(self.api.followers_ids, screen_name=user).pages():
             [self.api.create_friendship(id=i) for i in page]
 
-    def update_profile_photo(self, user):
+    def save_profile_photo(self, user):
+        try:
+            image_url = user.profile_image_url[:63]+user.profile_image_url[70:]
+            img_data = requests.get(image_url).content
+
+            with open('profile_photo.jpg', 'wb') as handler:
+                handler.write(img_data)
+        except Exception as e:
+            raise e
+
+    def save_profile_banner(self, user):
+        try:
+            image_url = user.profile_banner_url
+            img_data = requests.get(image_url).content
+
+            with open('banner_photo.jpg', 'wb') as handler:
+                handler.write(img_data)
+        except Exception as e:
+            raise e
+
+    def update_profile(self, user):
+        print("Updating your profile....")
         user = self.get_user(user)
-        image_url = user.profile_image_url[:63]+user.profile_image_url[70:]
-        img_data = requests.get(image_url).content
+        user_data = {"name": user.name,
+                     "location": user.location,
+                     "url": user.url,
+                     "description": user.description,
+                     "profile_link_color": user.profile_link_color,
+                     }
+        self.save_profile_photo(user)
+        self.save_profile_banner(user)
 
-        with open('last_cloned_profile.jpg', 'wb') as handler:
-            handler.write(img_data)
+        self.api.update_profile_image("./profile_photo.jpg")
+        self.api.update_profile_banner("./banner_photo.jpg")
+        self.api.update_profile(**user_data)
 
-        self.api.update_profile_image("./last_cloned_profile.jpg")
-
-        print("Successfully changed profile photo, you used @{} photo".
+        print("Successfully update your profile, using @{} profile".
               format(user.screen_name))
 
 
@@ -113,8 +140,6 @@ if __name__ == '__main__':
     if args.follow:
         bot.follow_all_users(user)
     if args.delete:
-        print("This will be developed soon..")
+        bot.delete_tweets()
     if args.up:
-        bot.update_profile_photo(user)
-    if len(set(vars(args).values())) == 1:
-        print("No flags given, nothing to do")
+        bot.update_profile(user)
