@@ -24,9 +24,9 @@ class Api(object):
     def get_user(self, user):
         return self.api.get_user(user)
 
-    def retrieve_tweets(self, user, count=10, include_rts=False):
+    def retrieve_tweets(self, user, count=20, include_rts=False):
         try:
-            return self.api.user_timeline(screen_name=user, count=20,
+            return self.api.user_timeline(screen_name=user, count=count,
                                           include_rts=include_rts)
         except Exception as e:
             raise e
@@ -38,8 +38,8 @@ class Api(object):
         except tweepy.TweepError as e:
             print(e.reason)
 
-    def clone_last_tweets(self, user_clone):
-        tweets = self.retrieve_tweets(user_clone)[::-1]
+    def clone_last_tweets(self, user_clone, quantity):
+        tweets = self.retrieve_tweets(user_clone, quantity)[::-1]
         self.post_tweet("@{} is going to be cloned".format(user_clone))
 
         for tweet in tweets:
@@ -60,9 +60,19 @@ class Api(object):
         for i in tweets:
             print(i.text+"\n")
 
-    def follow_all_users(self, user):
+    def follow_users(self, user, quantity):
+        print("Following {} users from {}".format(quantity, user))
         for page in tweepy.Cursor(self.api.followers_ids, screen_name=user).pages():
-            [self.api.create_friendship(id=i) for i in page]
+            size = min(len(page), quantity)
+
+            [self.api.create_friendship(id=page[i]) for i in range(size)]
+
+            if len(page) > quantity:
+                print("Followed {} users".format(quantity))
+                return
+            else:
+                print("Followed {} users".format(len(page)))
+                quantity -= len(page)
 
     def save_profile_photo(self, user):
         try:
@@ -87,7 +97,8 @@ class Api(object):
     def update_profile(self, user):
         print("Updating your profile....")
         user = self.get_user(user)
-        user_data = {"name": user.name,
+        user_data = {
+                     "name": user.name,
                      "location": user.location,
                      "url": user.url,
                      "description": user.description,
@@ -106,23 +117,24 @@ class Api(object):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--print", help="print tweets from the given profile",
-                        action="store_true")
-    parser.add_argument("-c", "--clone", help="clone some tweets from the given profile",
-                        action="store_true")
+    parser.add_argument("-p", "--print", help="print N tweets from the given profile",
+                        type=int)
+    parser.add_argument("-c", "--clone", help="clone N tweets from the given profile",
+                        type=int)
     parser.add_argument("-d", "--delete", help="delete all tweets from the authenticated account",
                         action="store_true")
-    parser.add_argument("-f", "--follow", help="follow all users from the given profile [slow]",
-                        action="store_true")
+    parser.add_argument("-f", "--follow", help="follow N users from the given profile [slow]",
+                        type=int)
     parser.add_argument("-up", help="update profile data using the profile cloning \
                          the given profile",
                         action="store_true")
     parser.add_argument("--user", help="provide user to clone from the command line",
                         action="store", type=str)
+    parser.add_argument("--export", help="sav",
+                        action="store", type=str)
     args = parser.parse_args()
 
     bot = Api()
-    secs = 1
 
     if args.user:
         user = args.user
@@ -130,11 +142,11 @@ if __name__ == '__main__':
         user = input("Give some public profile please\n")
 
     if args.print:
-        bot.print_tweets(bot.retrieve_tweets(user))
+        bot.print_tweets(bot.retrieve_tweets(user, args.print))
     if args.clone:
-        bot.clone_last_tweets(user)
+        bot.clone_last_tweets(user, args.clone)
     if args.follow:
-        bot.follow_all_users(user)
+        bot.follow_users(user, args.follow)
     if args.delete:
         bot.delete_tweets()
     if args.up:
