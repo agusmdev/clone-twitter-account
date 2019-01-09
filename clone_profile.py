@@ -3,58 +3,143 @@
 import tweepy
 import time
 import re
+import requests
 from access import *
 from random import randint
+import argparse
 import threading
 
 
 class Api(object):
     def __init__(self):
         super(Api, self).__init__()
-        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-        auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
+        try:
+            auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+            auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
+            # Return API access:
+            self.api = tweepy.API(auth, wait_on_rate_limit=True,
+                                  wait_on_rate_limit_notify=True, compression=True)
 
-        # Return API access:
-        self.api = tweepy.API(auth)
+            redirect_url = auth.get_authorization_url()
+        except tweepy.TweepError:
+            raise Exception('Error! Failed to get request token, please complete \
+                            access file')
 
     def get_user(self, user):
         return self.api.get_user(user)
 
-    def retrieve_tweets(self, user, count=10):
+    def retrieve_tweets(self, user, count=10, include_rts=False):
         try:
-            # print(len(list(tweepy.Cursor(self.api.user_timeline, id=user.id).items())))
-            return self.api.user_timeline(screen_name=user, count=20)
+            return self.api.user_timeline(screen_name=user, count=20,
+                                          include_rts=include_rts)
         except Exception as e:
             raise e
 
+    def post_tweet(self, tweet_text):
+        try:
+            self.api.update_status(tweet_text)
+            print("Successfully posted.")
+        except tweepy.TweepError as e:
+            print(e.reason)
+
     def clone_last_tweets(self, user_clone):
         tweets = self.retrieve_tweets(user_clone)[::-1]
+        self.post_tweet("@{} is going to be cloned".format(user_clone))
+
         for tweet in tweets:
             # Print tweet:
             print(tweet.text)
-            if tweet.text[0] != "R" and tweet.text[1] != "T":
-                try:
-                    self.api.update_status(tweet.text)
-                    print("Successfully posted.")
-                except tweepy.TweepError as e:
-                    print(e.reason)
-        return True
+            self.post_tweet(tweet.text)
 
     def delete_tweets(self):
-        print("Deleting all tweets from the account @%s."
-              % self.api.verify_credentials().screen_name)
+        print("Deleting all tweets from the account @".
+              format(self.api.verify_credentials().screen_name))
         for status in tweepy.Cursor(self.api.user_timeline).items():
             try:
                 self.api.destroy_status(status.id)
             except Exception as e:
                 print(e)
 
+    def print_tweets(self, tweets):
+        for i in tweets:
+            print(i.text+"\n")
 
-bot = Api()
+    def follow_all_users(self, user):
+        for page in tweepy.Cursor(self.api.followers_ids, screen_name=user).pages():
+            [self.api.create_friendship(id=i) for i in page]
 
-secs = 1
-user = bot.get_user(input("Ingrese un usuario: "))
-tweets = bot.retrieve_tweets(user)
-for i in tweets:
-    print(i.text)
-# threading.Thread(target=bot.clone_last_tweets(user.screen_name))
+    def save_profile_photo(self, user):
+        try:
+            image_url = user.profile_image_url[:63]+user.profile_image_url[70:]
+            img_data = requests.get(image_url).content
+
+            with open('profile_photo.jpg', 'wb') as handler:
+                handler.write(img_data)
+        except Exception as e:
+            raise e
+
+    def save_profile_banner(self, user):
+        try:
+            image_url = user.profile_banner_url
+            img_data = requests.get(image_url).content
+
+            with open('banner_photo.jpg', 'wb') as handler:
+                handler.write(img_data)
+        except Exception as e:
+            raise e
+
+    def update_profile(self, user):
+        print("Updating your profile....")
+        user = self.get_user(user)
+        user_data = {"name": user.name,
+                     "location": user.location,
+                     "url": user.url,
+                     "description": user.description,
+                     "profile_link_color": user.profile_link_color,
+                     }
+        self.save_profile_photo(user)
+        self.save_profile_banner(user)
+
+        self.api.update_profile_image("./profile_photo.jpg")
+        self.api.update_profile_banner("./banner_photo.jpg")
+        self.api.update_profile(**user_data)
+
+        print("Successfully update your profile, using @{} profile".
+              format(user.screen_name))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--print", help="print tweets from the given profile",
+                        action="store_true")
+    parser.add_argument("-c", "--clone", help="clone some tweets from the given profile",
+                        action="store_true")
+    parser.add_argument("-d", "--delete", help="delete all tweets from the account",
+                        action="store_true")
+    parser.add_argument("-f", "--follow", help="follow all users from the given profile",
+                        action="store_true")
+    parser.add_argument("-up", help="update profile photo using the profile photo \
+                                     from the given profile",
+                        action="store_true")
+    parser.add_argument("--user", help="provide user to clone from the command line",
+                        action="store", type=str)
+    args = parser.parse_args()
+
+    bot = Api()
+    secs = 1
+
+    if args.user:
+        user = args.user
+    else:
+        user = input("Give some public profile please\n")
+
+    if args.print:
+        bot.print_tweets(bot.retrieve_tweets(user))
+    if args.clone:
+        bot.clone_last_tweets(user)
+    if args.follow:
+        bot.follow_all_users(user)
+    if args.delete:
+        bot.delete_tweets()
+    if args.up:
+        bot.update_profile(user)
