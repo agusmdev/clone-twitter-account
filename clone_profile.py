@@ -87,11 +87,17 @@ if __name__ == '__main__':
     parser.add_argument("-up", help="update profile photo using the profile photo \
                                      from the given profile",
                         action="store_true")
+    parser.add_argument("--user", help="provide user to clone from the command line",
+                        action="store", type=str)
     args = parser.parse_args()
 
     bot = Api()
     secs = 1
-    user = input("Ingrese un usuario: ")
+    
+    if args.user:
+        user = args.user
+    else:
+        user = input("Give some public profile please\n")
 
     if args.print:
         bot.print_tweets(bot.retrieve_tweets(user))
